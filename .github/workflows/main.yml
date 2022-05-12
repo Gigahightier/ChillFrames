@@ -27,7 +27,8 @@ jobs:
           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\"
       - name: Build
         run: |
-          dotnet build --no-restore --configuration Release --nologo
+        dotnet restore -r win ${{ env.SOLUTION_NAME }}.sln
+        dotnet build --configuration Release
       - name: Archive
         run: Compress-Archive -Path ChillFrames/bin/Release/ChillFrames/* -DestinationPath ChillFrames.zip
       - name: Upload a Build Artifact
