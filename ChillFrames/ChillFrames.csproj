@@ -7,7 +7,7 @@
 	<AssemblyVersion>1.4.0.0</AssemblyVersion>
     <Description></Description>
     <Copyright></Copyright>
-    <PackageProjectUrl>https://github.com/MidoriKami/ChillFrames.git</PackageProjectUrl>
+    <PackageProjectUrl></PackageProjectUrl>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -20,6 +20,7 @@
 	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 	  <OutputPath>bin\$(Configuration)\</OutputPath>
 	  <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	  <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
