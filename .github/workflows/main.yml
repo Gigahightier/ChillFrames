@@ -1,62 +1,79 @@
-# This is a basic workflow to help you get started with Actions
+name: Build & deploy
 
-name: ChillFrames Release
-
-# Controls when the action will run. Triggers the workflow on tag creation
 on:
   workflow_dispatch:
+  
+env:
+  PLUGIN_NAME: ChillFrames
+  PERSONAL_PLUGIN_REPO: Gigahightier/MyDalamudPlugins
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: [windows-latest]
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    runs-on: windows-latest
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.0.2
+    - name: Checkout source
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Setup .NET for Build
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.100
+    - name: Restore dependencies
+      run: dotnet restore ./src
+    - name: Download Dalamud
+      run: |
+        Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+        Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev\"
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v0.9.11
+      with:
+        versionSpec: '5.x'
+    - name: Use GitVersion
+      id: gitversion
+      uses: gittools/actions/gitversion/execute@v0.9.11
+    - name: Build
+      run: |
+        dotnet build ./src --no-restore --configuration Release --nologo /property:Version=${{steps.gitversion.outputs.MajorMinorPatch}}
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.2.1
+      with:
+        name: PluginRepoZip
+        path: ./src/${{env.PLUGIN_NAME}}/bin/Release/${{env.PLUGIN_NAME}}
+        if-no-files-found: error
+          
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        repository: ${{env.PERSONAL_PLUGIN_REPO}}
+        token: ${{secrets.PAT}}
+    - uses: actions/download-artifact@v2
+      with:
+        name: PluginRepoZip
+        path: plugins/${{env.PLUGIN_NAME}}
+    - uses: EndBug/add-and-commit@v7
+      with:
+        add: --all
+        author_name: GitHub Action
+        author_email: github-actions[bot]@users.noreply.github.com
+        message: Update ${{env.PLUGIN_NAME}}
         
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v1.0.5
-        
-      - name: Restore NuGet Packages
-        run: nuget restore ChillFrames.sln
-
-      - name: Download Dalamud    
-        run: |
-           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile latest.zip
-           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"    
-        
-      - name: Build
-        run: msbuild ChillFrames.sln /p:Configuration=Release
-
-        
-      - name: Archive
-        run: Compress-Archive -Path ChillFrames.Dalamud\bin\Release\* -DestinationPath ChillFrames.Dalamud.zip
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
-        with:
-          tag_name: Release-${{ github.ref }}
-          release_name: ChillFrames - ${{ github.ref }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./ChillFrames.Dalamud.zip
-          asset_name: ChillFrames-Release-${{ github.ref }}.zip
-          asset_content_type: application/zip 
+  pull_request:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      id: download-artifact
+      with:
+        name: PluginRepoZip
+        path: PluginArtifact
+    - uses: Gigahightier/DalamudPluginPR@master
+      with:
+        enabled: true
+        testing: false
+        token: ${{secrets.PAT}}
+        artifact_path: ${{steps.download-artifact.outputs.download-path}}
