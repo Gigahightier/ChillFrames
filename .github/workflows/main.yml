@@ -1,79 +1,41 @@
-name: Build & deploy
-
+name: Build ChillFrames
 on:
-  workflow_dispatch:
-  
-env:
-  PLUGIN_NAME: ChillFrames
-  PERSONAL_PLUGIN_REPO: Gigahightier/MyDalamudPlugins
-
+  push:
+    branches:
+      - master
 jobs:
   build:
-    runs-on: windows-latest
+    if: "! contains(toJSON(github.event.commits.*.message), '[skip-ci]')"
+    runs-on: [windows-latest]
+
     steps:
-    - name: Checkout source
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: Setup .NET for Build
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: 5.0.100
-    - name: Restore dependencies
-      run: dotnet restore ./src
-    - name: Download Dalamud
-      run: |
-        Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
-        Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev\"
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v0.9.11
-      with:
-        versionSpec: '5.x'
-    - name: Use GitVersion
-      id: gitversion
-      uses: gittools/actions/gitversion/execute@v0.9.11
-    - name: Build
-      run: |
-        dotnet build ./src --no-restore --configuration Release --nologo /property:Version=${{steps.gitversion.outputs.MajorMinorPatch}}
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.2.1
-      with:
-        name: PluginRepoZip
-        path: ./src/${{env.PLUGIN_NAME}}/bin/Release/${{env.PLUGIN_NAME}}
-        if-no-files-found: error
-          
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        repository: ${{env.PERSONAL_PLUGIN_REPO}}
-        token: ${{secrets.PAT}}
-    - uses: actions/download-artifact@v2
-      with:
-        name: PluginRepoZip
-        path: plugins/${{env.PLUGIN_NAME}}
-    - uses: EndBug/add-and-commit@v7
-      with:
-        add: --all
-        author_name: GitHub Action
-        author_email: github-actions[bot]@users.noreply.github.com
-        message: Update ${{env.PLUGIN_NAME}}
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.0.2
         
-  pull_request:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v2
-      id: download-artifact
-      with:
-        name: PluginRepoZip
-        path: PluginArtifact
-    - uses: Gigahightier/DalamudPluginPR@master
-      with:
-        enabled: true
-        testing: false
-        token: ${{secrets.PAT}}
-        artifact_path: ${{steps.download-artifact.outputs.download-path}}
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v1.0.5
+        
+      - name: Restore NuGet Packages
+        run: nuget restore ChillFrames.sln
+
+      - name: Download Dalamud staging
+        run: |
+            Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile latest.zip
+            Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+            
+      - name: Build
+        run: msbuild ChillFrames.sln /p:Configuration=Release
+
+      - name: Extract Publish
+        run: |
+          Expand-Archive -Force ./bin/x64/Release/ChillFrames/latest.zip ./Artifact
+          
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v2.2.1
+        with:
+          name: artifact
+          path: ./Artifact/*
