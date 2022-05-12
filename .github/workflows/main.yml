@@ -12,9 +12,9 @@ env:
   PUBLIC_NAME: ChillFrames
   SOLUTION_NAME: ChillFrames
   INTERNAL_NAME: ChillFrames
-  RELEASE_DIR: ChillFrames\bin\Release\XIVComboExpanded
-  PERSONAL_PLUGIN_REPO: daemitus/MyDalamudPlugins
-  PR_PLUGIN_REPO: daemitus/DalamudPlugins
+  RELEASE_DIR: ChillFrames\bin\Release\Chillframes
+  PERSONAL_PLUGIN_REPO: Gigahightier/MyDalamudPlugins
+  PR_PLUGIN_REPO: Gigahightier/DalamudPlugins
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
